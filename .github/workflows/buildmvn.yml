@@ -18,6 +18,7 @@ jobs:
       PLATFORM_REPO: 'sum-cba-maven-virtual'
       BUILD_NAME: "cba-maven-build"
       BUILD_NUMBER: "${{github.run_number}}"
+      MODULE_NAME: "CBA-MODULE"
        
     # defaults:
     #  run:
