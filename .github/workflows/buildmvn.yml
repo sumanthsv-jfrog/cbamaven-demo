@@ -1,0 +1,84 @@
+name: "JFrog-GitHub MVN Publish OIDC Integration"
+on: workflow_dispatch
+
+
+# This is required as per below link
+# https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-cloud-providers#adding-permissions-settings
+permissions:
+  contents: read # Allow reading repository content
+  packages: write # Allow writing to GitHub Packages
+  id-token: write # Required for OIDC authentication with JFrog
+
+jobs:
+  build:
+     runs-on: ubuntu-latest
+     env:
+       JFROG_CLI_LOG_LEVEL: DEBUG
+       MODULE_NAME: 'infymvnmodule'
+       PLATFORM_REPO: 'Infosys-mvn-dev-virtual'
+       BUILD_NAME: "infymvn-build"
+       BUILD_NUMBER: "${{github.run_number}}"
+       
+    # defaults:
+    #  run:
+    #    working-directory: ./package
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v3
+         
+       - name: Debug OIDC Claims
+         uses: steve-todorov/oidc-debugger-action@v1
+         with:
+           audience: '${{ github.server_url }}/${{ github.repository }}'
+              
+       - name: Set up Java for Maven
+         uses: actions/setup-java@v4
+         with:
+           distribution: 'temurin'
+           java-version: '17'
+           
+       - name: Set up Maven 3.9.11
+         uses: stCarolas/setup-maven@v5
+         with:
+           maven-version: 3.9.11           
+           
+       - name: Setup JFrog CLI
+         uses: jfrog/setup-jfrog-cli@v4
+         env:  
+           JF_URL: https://${{ vars.JF_URL }}
+           #JF_USER: ${{ vars.JF_USER }}
+           #JF_ACCESS_TOKEN: ${{ vars.JF_ACCESS_TOKEN }}                  
+         with:
+           oidc-provider-name: destgithub
+           
+       - name: Check connectivity
+         run: |
+           jf config show
+           jf rt ping
+
+       - name: Set Maven Config
+         run: | 
+           jf mvnc --repo-deploy-releases=$PLATFORM_REPO --repo-deploy-snapshots=$PLATFORM_REPO --repo-resolve-releases=$PLATFORM_REPO --repo-resolve-snapshots=$PLATFORM_REPO
+
+       # - name: Run Audit scan for the git workspace
+       #   run: jf audit . 
+           
+       - name: Mvn Clean Install
+         run: |
+           jf mvn clean install -U --build-name=$BUILD_NAME --build-number=$BUILD_NUMBER --module $MODULE_NAME
+         
+       - name: Publish Build info With JFrog CLI
+         run: |
+          # Collect environment variables for the build
+          jf rt build-collect-env $BUILD_NAME $BUILD_NUMBER 
+          
+          # Collect VCS details from git and add them to the build 
+          jf rt build-add-git $BUILD_NAME $BUILD_NUMBER 
+          
+          # Publish build info 
+          jf rt build-publish $BUILD_NAME $BUILD_NUMBER
+          
+       - name: Run build scan
+         run: jf build-scan $BUILD_NAME  $BUILD_NUMBER
+
+       
