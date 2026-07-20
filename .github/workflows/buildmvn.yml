@@ -17,7 +17,7 @@ jobs:
       OIDC_AUDIENCE: 'cba-github-oidc'
       PLATFORM_REPO: 'sum-cba-maven-virtual'
       BUILD_NAME: "cba-maven-build"
-      BUILD_ID: "${{github.run_number}}"
+      BUILD_NUMBER: "${{github.run_number}}"
        
     # defaults:
     #  run:
